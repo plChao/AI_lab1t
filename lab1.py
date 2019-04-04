@@ -3,9 +3,15 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 import time
+import random
 maxlenofdic = 16
 tStart = time.time()                                                            #計時開始
-
+class anspair:
+    def __init__(self, puzzlenum, ans):
+        self.puzzlenum = int(puzzlenum)
+        self.ans = ans
+    def __repr__(self):
+        return "("+str(self.puzzlenum)+","+self.ans+")"
 class status:
     def __init__(self, puzzles, assignments = []):
         self.puzzles = puzzles
@@ -16,49 +22,65 @@ class status:
             print(x.cord)
             print(x.lens)
             print(x.direction)
+            print(x.num)
+            print(len(x.boundary))
             #print(x.boundary)
-            #print [cord.x for cord in x.relations]
             print(x.relations)
             print(x.relationum)
             print("-------------------")
         print("anser")
         print(self.assignments)
-    def MRV(self):                                                              #Minimum remaining values heuristic
-        mini = 3000
-        for x in self.puzzles:
-            if mini > len(x.boundary) :
-                mini = len(x.boundary)
-                ans = x
-        return ans
-    def DegreeH(self):                                                          #Degree heuristic
-        maxi = 0
-        for x in self.puzzles:
-            if maxi < len(x.relations) :
-                maxi = len(x.relations)
-                ans = x
-        return ans
-    def LCV(self, puzzle):                                                      #Least constraining value heuristic
-        mini = 3000*len(self.puzzles)
-        for x in puzzle.boundary:
-            tmp = self.constrain(puzzle,x)
-            if mini > tmp:
-                mini = tmp
-                ans = x
-        return ans
+    def puzzlesSort(self, MRV, DegreeH):
+        puzzlecopy = self.puzzles.copy()
+        random.shuffle(puzzlecopy)
+        if MRV == 1 and DegreeH ==1 :
+            puzzlecopy = sorted(puzzlecopy)
+        elif MRV == 1 and DegreeH ==0 :
+            puzzlecopy = sorted(puzzlecopy, key = lambda x : len(x.boundary))
+        elif MRV == 0 and DegreeH ==1 :
+            puzzlecopy = sorted(puzzlecopy, key = lambda x : x.relationum, reverse = True)
+        #test = status(puzzlecopy)
+        #test.print()
+        return puzzlecopy
+    def constReBound(self, puzzle, value) :
+        newbound = []
+        for x in range(0,len(puzzle.relations)) :
+            if puzzle.relations[x].x != -1 :
+                print(puzzle.relations[x])
+                if puzzle.direction == 'A' :
+                    crossletter = value[puzzle.relations[x].x-puzzle.cord.x]
+                    print(crossletter)
+                    position = puzzle.relations[x].y - self.puzzles[x].cord.y
+                    print(position)
+                    for y in self.puzzles[x].boundary:
+                        if y[position] == crossletter:
+                            newbound.append(y)
+                    print(x)
+                    self.puzzles[x].boundary = newbound.copy()
+                else :
+                    print(puzzle.relations[x].x-puzzle.cord.x)
+                    crossletter = value[puzzle.cord.y - puzzle.relations[x].y]
+                    position = puzzle.relations[x].x - self.puzzles[x].cord.x
+                    for y in self.puzzles[x].boundary:
+                        if y[position] == crossletter:
+                            newbound.append(y)
+                    self.puzzles[x].boundary = newbound.copy()
+                print(self.puzzles[x].boundary)
+
     def constrain(self, puzzle, value) :
         ans = 0
         for x in range(0,len(puzzle.relations)) :
             if puzzle.relations[x].x != -1 :
                 if puzzle.direction == 'A' :
                     crossletter = value[puzzle.relations[x].x-puzzle.cord.x]
-                    position = puzzles[x].cord.y - puzzle.relations[x].y
-                    for y in puzzles[x].boundary:
+                    position =  puzzle.relations[x].y - self.puzzles[x].cord.y
+                    for y in self.puzzles[x].boundary:
                         if y[position] != crossletter:
                             ans += 1
                 else :
                     crossletter = value[puzzle.cord.y - puzzle.relations[x].y]
-                    position = puzzle.relations[x].x - puzzles[x].cord.x
-                    for y in puzzles[x].boundary:
+                    position = puzzle.relations[x].x - self.puzzles[x].cord.x
+                    for y in self.puzzles[x].boundary:
                         if y[position] != crossletter:
                             ans += 1
         return ans
@@ -76,13 +98,14 @@ class cord:
         return "("+str(self.x)+","+str(self.y)+")"
 
 class puzzle:
-    def __init__(self, x, y, lens, direction, boundary, relations = [], relationum = 0):
+    def __init__(self, x, y, lens, direction, boundary, num, relations = [], relationum = 0):
         self.cord = cord(x, y)
         self.lens = int(lens)
         self.direction = direction
         self.boundary = boundary
         self.relations = []
         self.relationum = 0
+        self.num = num
 
     def relation(self, block):
         if self == block :
@@ -107,19 +130,47 @@ class puzzle:
             else :
                 ans = cord(-1,-1)
                 return ans;
-    def boundCondNum(self, word, position):
-        ans = 0
-        for x in self.boundary :
-            if x[position] == word :
-                ans+=1
-        return ans
+    def __lt__(x, y):
+        if len(x.boundary) == len(y.boundary):
+            return y.relationum < x.relationum
+        else:
+            return len(x.boundary) < len(y.boundary)
+    def __eq__(x, y):
+        return x.num == y.num
 
 
 
+def DFS(node, MRV = 1, DegreeH = 1, LCV = 1, AC3 = 1):
+    mini = 3000*len(node.puzzles)
+    # MRV,DegreeH
+    order = node.puzzlesSort(MRV,DegreeH)
+    ans = []
+    #LCV
+    #for x in order :
 
+    for y in order[0].boundary:
+        tmp = node.constrain(order[0],y)
+        if mini > tmp:
+            mini = tmp
+            ans.clear()
+            ans.append(y)
+        elif mini == tmp:
+            ans.append(y)
+    #random.shuffle(ans)
+    # AC3
+    puzzlecopy = node.puzzles.copy()
+    childnode = status(puzzlecopy)
 
-def DFS(status, MRV, DegreeH, LCV, AC3):
-    print(1)
+    childnode.print()
+
+    childnode.constReBound(order[0],ans[0])
+
+    childnode.print()
+
+    childnode.puzzles.remove(order[0])
+    decide = anspair(order[0].num,ans[0])
+    childnode.assignments.append(decide)
+    #DFS(childnode)
 
 
 
@@ -129,7 +180,7 @@ def solve(graphli,dictionary):
         x = x.replace('\n', '')
         tmp = x.split(" ")
         blocks.append(puzzle(tmp[0],tmp[1],tmp[2],tmp[3], \
-            dictionary[int(tmp[2])]))
+            dictionary[int(tmp[2])], len(blocks)))
     for x in blocks :                                                           # initilize the binary relation
         for y in blocks :
             no_relation = cord(-1,-1)
@@ -139,8 +190,8 @@ def solve(graphli,dictionary):
                 x.relationum +=1
 
     root = status(blocks)
-    root.print()
-    ans = DFS(root,1,1,1,1)
+
+    ans = DFS(root)
 
 
 
