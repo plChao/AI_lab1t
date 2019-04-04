@@ -16,19 +16,27 @@ class status:
     def __init__(self, puzzles, assignments = []):
         self.puzzles = puzzles
         self.assignments = []
+    #def showpuzzle():
+
+    def getpuzzle(self, num):
+        for x in self.puzzles:
+            if x.num == num:
+                return x
+        print("error: non puzzle")
+        print(num)
     def print(self):
         print("puzzles")
         for x in self.puzzles:
-            print(x.cord)
-            print(x.lens)
-            print(x.direction)
+            #print(x.cord)
+            #print(x.lens)
+            #print(x.direction)
             print(x.num)
             print(len(x.boundary))
             #print(x.boundary)
-            print(x.relations)
-            print(x.relationum)
+            #print(x.relations)
+            #print(x.relationum)
             print("-------------------")
-        print("anser")
+        #print("anser")
         print(self.assignments)
     def puzzlesSort(self, MRV, DegreeH):
         puzzlecopy = self.puzzles.copy()
@@ -44,47 +52,66 @@ class status:
         return puzzlecopy
     def constReBound(self, puzzle, value) :
         newbound = []
+        #print(value)
         for x in range(0,len(puzzle.relations)) :
             if puzzle.relations[x].x != -1 :
-                print(puzzle.relations[x])
+                newbound.clear()
+                target = self.getpuzzle(x)
+                #print(puzzle.relations[x])
                 if puzzle.direction == 'A' :
+                    #print(puzzle.relations[x].y - puzzle.cord.y)
                     crossletter = value[puzzle.relations[x].x-puzzle.cord.x]
-                    print(crossletter)
-                    position = puzzle.relations[x].y - self.puzzles[x].cord.y
-                    print(position)
-                    for y in self.puzzles[x].boundary:
+                    #print(crossletter)
+                    position = puzzle.relations[x].y - target.cord.y
+                    #print(position)
+                    for y in target.boundary:
                         if y[position] == crossletter:
                             newbound.append(y)
-                    print(x)
-                    self.puzzles[x].boundary = newbound.copy()
+                    target.boundary = newbound.copy()
                 else :
-                    print(puzzle.relations[x].x-puzzle.cord.x)
-                    crossletter = value[puzzle.cord.y - puzzle.relations[x].y]
-                    position = puzzle.relations[x].x - self.puzzles[x].cord.x
-                    for y in self.puzzles[x].boundary:
+                    #print(puzzle.relations[x].y - puzzle.cord.y)
+                    crossletter = value[puzzle.relations[x].y - puzzle.cord.y]
+                    #print(crossletter)
+                    position = puzzle.relations[x].x - target.cord.x
+                    #print(position)
+                    for y in target.boundary:
                         if y[position] == crossletter:
                             newbound.append(y)
-                    self.puzzles[x].boundary = newbound.copy()
-                print(self.puzzles[x].boundary)
+                    target.boundary = newbound.copy()
+                #print(self.puzzles[x].boundary)
 
     def constrain(self, puzzle, value) :
         ans = 0
         for x in range(0,len(puzzle.relations)) :
             if puzzle.relations[x].x != -1 :
+                #print(puzzle.relations[x])
+                target = self.getpuzzle(x)
                 if puzzle.direction == 'A' :
                     crossletter = value[puzzle.relations[x].x-puzzle.cord.x]
-                    position =  puzzle.relations[x].y - self.puzzles[x].cord.y
-                    for y in self.puzzles[x].boundary:
+                    position =  puzzle.relations[x].y - target.cord.y
+                    for y in target.boundary:
                         if y[position] != crossletter:
                             ans += 1
                 else :
-                    crossletter = value[puzzle.cord.y - puzzle.relations[x].y]
-                    position = puzzle.relations[x].x - self.puzzles[x].cord.x
-                    for y in self.puzzles[x].boundary:
+                    crossletter = value[puzzle.relations[x].y - puzzle.cord.y]
+                    #print(crossletter)
+                    position = puzzle.relations[x].x - target.cord.x
+                    #print(position)
+                    #print(target.boundary)
+                    for y in target.boundary:
                         if y[position] != crossletter:
                             ans += 1
         return ans
-
+    def getanswer(self):
+        for x in self.puzzles:
+            if len(x.boundary) == 0:
+                return False
+        return True
+    def success(self):
+        if len(self.assignments) == len(self.puzzles) :
+            print("success!!!")
+            return True
+        return False
 
 class cord:
     def __init__(self, x, y):
@@ -138,39 +165,61 @@ class puzzle:
     def __eq__(x, y):
         return x.num == y.num
 
+def gettarget(order):
+    for x in range(0,len(order)):
+        if len(order[x].boundary) > 1:
+            return order[x]
+def DFS(node, MRV = 1, DegreeH = 0, LCV = 1, AC3 = 1, layer = 1):
+    #node.print()
+    if len(node.assignments) == len(node.puzzles) :
+        print("success!!!")
+        return node
+    for x in node.puzzles:
+        if len(x.boundary) == 0:
+            print("failded QQ")
+            return node
 
-
-def DFS(node, MRV = 1, DegreeH = 1, LCV = 1, AC3 = 1):
     mini = 3000*len(node.puzzles)
     # MRV,DegreeH
     order = node.puzzlesSort(MRV,DegreeH)
-    ans = []
     #LCV
-    #for x in order :
+    for target in order :
+        if len(target.boundary) == 1:
+            continue
+        print("layer" + str(layer))
+        #test = status(order)
+        #test.print()
+        #print(target.boundary)
+        target.boundary = sorted(target.boundary, key = lambda x : node.constrain(target,x))
+        #print(target.boundary)
+        for y in target.boundary:
+            #print(len(target.boundary))
+            #print(y)
+            puzzlecopy = node.puzzles.copy()
+            childnode = status(puzzlecopy)
 
-    for y in order[0].boundary:
-        tmp = node.constrain(order[0],y)
-        if mini > tmp:
-            mini = tmp
-            ans.clear()
-            ans.append(y)
-        elif mini == tmp:
-            ans.append(y)
-    #random.shuffle(ans)
-    # AC3
-    puzzlecopy = node.puzzles.copy()
-    childnode = status(puzzlecopy)
+            childnode.constReBound(target,y)
+            childnode.getpuzzle(target.num).boundary.clear()
+            childnode.getpuzzle(target.num).boundary.append(y)
+            decide = anspair(target.num,y)
+            #print(decide)
+            childnode.assignments = node.assignments
+            childnode.assignments.append(decide)
+            print("childnode")
+            childnode.print()
+            print("node")
+            node.print()
+            if not childnode.getanswer() :              #forword cheaking
+                print("cheak this ganna filed")
+                continue
 
-    childnode.print()
+            terminalnode = DFS(childnode, layer = layer + 1)
+            if terminalnode.success():
+                return terminalnode
 
-    childnode.constReBound(order[0],ans[0])
+    print("re node")
+    return node
 
-    childnode.print()
-
-    childnode.puzzles.remove(order[0])
-    decide = anspair(order[0].num,ans[0])
-    childnode.assignments.append(decide)
-    #DFS(childnode)
 
 
 
@@ -193,9 +242,7 @@ def solve(graphli,dictionary):
 
     ans = DFS(root)
 
-
-
-
+    ans.print()
 
 
 #open dictionary, the max len in dic is 14
@@ -218,7 +265,7 @@ puzzle_f = open("puzzle.txt", "r")
 question = puzzle_f.readlines()
 
 # solve
-for x in range(0,1) :
+for x in range(3,4) :
     graph = question[x].split("   ")
     solve(graph, dictionary)
 
