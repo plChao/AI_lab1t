@@ -2,10 +2,23 @@
 # -*- coding: UTF-8 -*-
 # -*- coding: utf-8 -*-
 import numpy as np
+import copy
 import time
 import random
 maxlenofdic = 16
+maxgoingnode = 100
+nodevisit = 0
 tStart = time.time()                                                            #計時開始
+def copyr(relations):
+    copyrela = []
+    for x in relations:
+        copyrela.append(cord(x.x,x.y))
+    return copyrela
+def copya(assignments):
+    copyas = []
+    for x in assignments:
+        copyas.append(anspair(x.puzzlenum,x.ans))
+    return copyas
 class anspair:
     def __init__(self, puzzlenum, ans):
         self.puzzlenum = int(puzzlenum)
@@ -17,6 +30,14 @@ class status:
         self.puzzles = puzzles
         self.assignments = []
     #def showpuzzle():
+    def copyn(self):
+        puzzlecopy = []
+        for x in self.puzzles:
+            puzzlecopy.append(puzzle(x.cord.x,x.cord.y,x.lens,x.direction, \
+                x.boundary.copy(),x.num))
+            puzzlecopy[len(puzzlecopy)-1].relations = copyr(x.relations)
+            puzzlecopy[len(puzzlecopy)-1].relationum = x.relationum
+        return puzzlecopy
 
     def getpuzzle(self, num):
         for x in self.puzzles:
@@ -27,20 +48,20 @@ class status:
     def print(self):
         print("puzzles")
         for x in self.puzzles:
-            #print(x.cord)
-            #print(x.lens)
-            #print(x.direction)
+            print(x.cord)
+            print(x.lens)
+            print(x.direction)
             print(x.num)
             print(len(x.boundary))
-            #print(x.boundary)
-            #print(x.relations)
-            #print(x.relationum)
+            print(x.boundary)
+            print(x.relations)
+            print(x.relationum)
             print("-------------------")
         #print("anser")
         print(self.assignments)
     def puzzlesSort(self, MRV, DegreeH):
         puzzlecopy = self.puzzles.copy()
-        random.shuffle(puzzlecopy)
+        #random.shuffle(puzzlecopy)
         if MRV == 1 and DegreeH ==1 :
             puzzlecopy = sorted(puzzlecopy)
         elif MRV == 1 and DegreeH ==0 :
@@ -50,6 +71,7 @@ class status:
         #test = status(puzzlecopy)
         #test.print()
         return puzzlecopy
+    #def constAC3Reboun
     def constReBound(self, puzzle, value) :
         newbound = []
         #print(value)
@@ -109,7 +131,7 @@ class status:
         return True
     def success(self):
         if len(self.assignments) == len(self.puzzles) :
-            print("success!!!")
+            #print("success!!!")
             return True
         return False
 
@@ -169,55 +191,67 @@ def gettarget(order):
     for x in range(0,len(order)):
         if len(order[x].boundary) > 1:
             return order[x]
-def DFS(node, MRV = 1, DegreeH = 0, LCV = 1, AC3 = 1, layer = 1):
+def DFS(node, MRV = False, DegreeH = False,LCV = False, AC3 = 1):
     #node.print()
+    global nodevisit
     if len(node.assignments) == len(node.puzzles) :
         print("success!!!")
         return node
     for x in node.puzzles:
         if len(x.boundary) == 0:
-            print("failded QQ")
+            #print("failded QQ")
             return node
 
     mini = 3000*len(node.puzzles)
     # MRV,DegreeH
+
     order = node.puzzlesSort(MRV,DegreeH)
+    #node.print()
+    #test = status(order)
+    #test.print()
     #LCV
     for target in order :
         if len(target.boundary) == 1:
             continue
-        print("layer" + str(layer))
+        #print(target.num)
+        #print("layer" + str(layer))
         #test = status(order)
         #test.print()
         #print(target.boundary)
-        target.boundary = sorted(target.boundary, key = lambda x : node.constrain(target,x))
+        #random.shuffle(target.boundary)
+        if LCV :
+            target.boundary = sorted(target.boundary, key = lambda x : node.constrain(target,x), reverse = False)
         #print(target.boundary)
         for y in target.boundary:
             #print(len(target.boundary))
             #print(y)
-            puzzlecopy = node.puzzles.copy()
+            #puzzlecopy = copy.deepcopy(node.puzzles)
+            puzzlecopy = node.copyn()
             childnode = status(puzzlecopy)
 
+            nodevisit+=1
             childnode.constReBound(target,y)
+            if not childnode.getanswer() :           #forword cheaking
+                #print("cheak this ganna filed")
+                childnode.puzzles.clear()
+                childnode.assignments.clear()
+                continue
+
             childnode.getpuzzle(target.num).boundary.clear()
             childnode.getpuzzle(target.num).boundary.append(y)
             decide = anspair(target.num,y)
             #print(decide)
-            childnode.assignments = node.assignments
+            childnode.assignments = copya(node.assignments)
             childnode.assignments.append(decide)
-            print("childnode")
-            childnode.print()
-            print("node")
-            node.print()
-            if not childnode.getanswer() :              #forword cheaking
-                print("cheak this ganna filed")
-                continue
-
-            terminalnode = DFS(childnode, layer = layer + 1)
+            #print("childnode")
+            #childnode.print()
+            #print("node")
+            #node.print()
+            terminalnode = DFS(childnode)
             if terminalnode.success():
                 return terminalnode
 
-    print("re node")
+    #print("re node")
     return node
 
 
@@ -239,10 +273,9 @@ def solve(graphli,dictionary):
                 x.relationum +=1
 
     root = status(blocks)
-
     ans = DFS(root)
-
     ans.print()
+    print(nodevisit)
 
 
 #open dictionary, the max len in dic is 14
@@ -265,6 +298,7 @@ puzzle_f = open("puzzle.txt", "r")
 question = puzzle_f.readlines()
 
 # solve
+nodevisit = 0
 for x in range(3,4) :
     graph = question[x].split("   ")
     solve(graph, dictionary)
