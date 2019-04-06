@@ -1,14 +1,13 @@
 #!/usr/bin/python
 # -*- coding: UTF-8 -*-
 # -*- coding: utf-8 -*-
-import numpy as np
-import copy
 import time
 import random
+import datetime
 maxlenofdic = 16
-maxgoingnode = 100
-nodevisit = 0
-tStart = time.time()                                                            #計時開始
+maxgoingnode = 200*10000
+tStart = time.time()                                                       #計時開始
+print(datetime.datetime.now().time())
 def copyr(relations):
     copyrela = []
     for x in relations:
@@ -46,6 +45,7 @@ class status:
         print("error: non puzzle")
         print(num)
     def print(self):
+        '''
         print("puzzles")
         for x in self.puzzles:
             print(x.cord)
@@ -57,11 +57,13 @@ class status:
             print(x.relations)
             print(x.relationum)
             print("-------------------")
+        '''
         #print("anser")
         print(self.assignments)
-    def puzzlesSort(self, MRV, DegreeH):
+    def puzzlesSort(self, MRV, DegreeH,Random):
         puzzlecopy = self.puzzles.copy()
-        #random.shuffle(puzzlecopy)
+        if Random:
+            random.shuffle(puzzlecopy)
         if MRV == 1 and DegreeH ==1 :
             puzzlecopy = sorted(puzzlecopy)
         elif MRV == 1 and DegreeH ==0 :
@@ -71,7 +73,47 @@ class status:
         #test = status(puzzlecopy)
         #test.print()
         return puzzlecopy
-    #def constAC3Reboun
+    def constAC3Reboun(self, puzzlef):
+        stack = []
+        stack.append(self.getpuzzle(puzzlef.num))
+        newbound = []
+        while len(stack)!=0:
+            puzzle = stack.pop()
+            #print(puzzle.boundary)
+            for x in range(0,len(puzzle.relations)):
+                if puzzle.relations[x].x != -1 :
+                    newbound.clear()
+                    target = self.getpuzzle(x)
+                    #print(puzzle.relations[x])
+                    if puzzle.direction == 'A' :
+                        crossletter = set()
+                        for y in puzzle.boundary:
+                            crossletter.add(y[puzzle.relations[x].x-puzzle.cord.x])
+                        #print(crossletter)
+                        position = puzzle.relations[x].y - target.cord.y
+                        #print(position)
+                        for y in target.boundary:
+                            if y[position] in crossletter:
+                                newbound.append(y)
+                        if target.boundary != newbound:
+                            target.boundary = newbound.copy()
+                            stack.append(target)
+                    else :
+                        #print(puzzle.relations[x].y - puzzle.cord.y)
+                        crossletter = set()
+                        for y in puzzle.boundary:
+                            crossletter.add(y[puzzle.relations[x].y - puzzle.cord.y])
+                        #print(crossletter)
+                        position = puzzle.relations[x].x - target.cord.x
+                        #print(position)
+                        for y in target.boundary:
+                            if y[position] in crossletter:
+                                newbound.append(y)
+                        if target.boundary != newbound:
+                            target.boundary = newbound.copy()
+                            stack.append(target)
+                    #print(self.puzzles[x].boundary)
+
     def constReBound(self, puzzle, value) :
         newbound = []
         #print(value)
@@ -187,15 +229,13 @@ class puzzle:
     def __eq__(x, y):
         return x.num == y.num
 
-def gettarget(order):
-    for x in range(0,len(order)):
-        if len(order[x].boundary) > 1:
-            return order[x]
-def DFS(node, MRV = False, DegreeH = False,LCV = False, AC3 = 1):
+def DFS(node, MRV, DegreeH, LCV, AC3, Random):
     #node.print()
     global nodevisit
+    global forward
+    global maxgoingnode
     if len(node.assignments) == len(node.puzzles) :
-        print("success!!!")
+        #print("success!!!")
         return node
     for x in node.puzzles:
         if len(x.boundary) == 0:
@@ -205,7 +245,7 @@ def DFS(node, MRV = False, DegreeH = False,LCV = False, AC3 = 1):
     mini = 3000*len(node.puzzles)
     # MRV,DegreeH
 
-    order = node.puzzlesSort(MRV,DegreeH)
+    order = node.puzzlesSort(MRV,DegreeH,Random)
     #node.print()
     #test = status(order)
     #test.print()
@@ -218,7 +258,8 @@ def DFS(node, MRV = False, DegreeH = False,LCV = False, AC3 = 1):
         #test = status(order)
         #test.print()
         #print(target.boundary)
-        #random.shuffle(target.boundary)
+        if Random :
+            random.shuffle(target.boundary)
         if LCV :
             target.boundary = sorted(target.boundary, key = lambda x : node.constrain(target,x), reverse = False)
         #print(target.boundary)
@@ -230,15 +271,27 @@ def DFS(node, MRV = False, DegreeH = False,LCV = False, AC3 = 1):
             childnode = status(puzzlecopy)
 
             nodevisit+=1
-            childnode.constReBound(target,y)
+            if(nodevisit > maxgoingnode):
+                return node
+
+            childnode.getpuzzle(target.num).boundary.clear()
+            childnode.getpuzzle(target.num).boundary.append(y)
+
+            if AC3:
+                #print("AC3 "+str(target.num))
+                childnode.constAC3Reboun(target)
+                #print("endAC3")
+                #childnode.print()
+            else:
+                childnode.constReBound(target,y)
             if not childnode.getanswer() :           #forword cheaking
                 #print("cheak this ganna filed")
+                forward += 1
                 childnode.puzzles.clear()
                 childnode.assignments.clear()
                 continue
 
-            childnode.getpuzzle(target.num).boundary.clear()
-            childnode.getpuzzle(target.num).boundary.append(y)
+
             decide = anspair(target.num,y)
             #print(decide)
             childnode.assignments = copya(node.assignments)
@@ -247,7 +300,7 @@ def DFS(node, MRV = False, DegreeH = False,LCV = False, AC3 = 1):
             #childnode.print()
             #print("node")
             #node.print()
-            terminalnode = DFS(childnode)
+            terminalnode = DFS(childnode,MRV,DegreeH,LCV,AC3,Random)
             if terminalnode.success():
                 return terminalnode
 
@@ -255,9 +308,7 @@ def DFS(node, MRV = False, DegreeH = False,LCV = False, AC3 = 1):
     return node
 
 
-
-
-def solve(graphli,dictionary):
+def solve(graphli,dictionary, MRV = False, DegreeH = False,LCV = False, AC3 = True, Random = False):
     blocks = []
     for x in graphli :                                                          # read blocks and initialize puzzles
         x = x.replace('\n', '')
@@ -273,9 +324,12 @@ def solve(graphli,dictionary):
                 x.relationum +=1
 
     root = status(blocks)
-    ans = DFS(root)
+    ans = DFS(root,MRV,DegreeH,LCV,AC3,Random)
+    print("MRV:" +str(MRV)+" Degree:" + str(DegreeH)+" LCV:"+str(LCV)+" AC3:"+str(AC3)+" Random:"+str(Random))
     ans.print()
-    print(nodevisit)
+    print("visited nodes "+str(nodevisit))
+    print("forward checking "+str(forward))
+
 
 
 #open dictionary, the max len in dic is 14
@@ -299,9 +353,12 @@ question = puzzle_f.readlines()
 
 # solve
 nodevisit = 0
+forward = 0
 for x in range(3,4) :
     graph = question[x].split("   ")
     solve(graph, dictionary)
+    nodevisit = 0
+    forward = 0
 
 
 
